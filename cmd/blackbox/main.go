@@ -7,11 +7,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
-	"os/user"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -21,7 +18,17 @@ import (
 	sheets "google.golang.org/api/sheets/v4"
 )
 
-const clientSecretFile = "client_secret.json"
+func getVariableOrDefault(varName, defaultValue string) string {
+	varValue := os.Getenv(varName)
+	if len(varValue) > 0 {
+		return varValue
+	}
+	return defaultValue
+}
+
+var clientSecretFile = getVariableOrDefault("CLIENT_SECRET_FILE", "client_secret.json")
+var cachedCredsFile = getVariableOrDefault("CACHED_CREDS_FILE", "blackbox.creds.json")
+
 const spreadsheetsScope = "https://www.googleapis.com/auth/spreadsheets"
 
 func auth() (*sheets.Service, error) {
@@ -44,17 +51,13 @@ func auth() (*sheets.Service, error) {
 }
 
 func getClient(ctx context.Context, config *oauth2.Config) (*http.Client, error) {
-	cacheFile, err := tokenCacheFile()
-	if err != nil {
-		return nil, fmt.Errorf("Unable to get path to cached credential file. %v", err)
-	}
-	tok, err := tokenFromFile(cacheFile)
+	tok, err := tokenFromFile(cachedCredsFile)
 	if err != nil {
 		tok, err = getTokenFromWeb(config)
 		if err != nil {
 			return nil, err
 		}
-		saveToken(cacheFile, tok)
+		saveToken(cachedCredsFile, tok)
 	}
 	return config.Client(ctx, tok), nil
 }
@@ -76,19 +79,6 @@ func getTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
 		return nil, fmt.Errorf("Unable to retrieve token from web %v", err)
 	}
 	return tok, nil
-}
-
-// tokenCacheFile generates credential file path/filename.
-// It returns the generated credential path/filename.
-func tokenCacheFile() (string, error) {
-	usr, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-	tokenCacheDir := filepath.Join(usr.HomeDir, ".credentials")
-	os.MkdirAll(tokenCacheDir, 0700)
-	return filepath.Join(tokenCacheDir,
-		url.QueryEscape("et.json")), err
 }
 
 // tokenFromFile retrieves a Token from a given file path.
