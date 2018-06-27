@@ -36,5 +36,7 @@ jobs:
             echo "$CLIENT_SECRET_JSON" > $CLIENT_SECRET_FILE
             echo "$CACHED_CREDS_JSON" > $CACHED_CREDS_FILE
             go get github.com/oozie/blackbox/cmd/blackbox
+            wget https://github.com/stedolan/jq/releases/download/jq-1.5/jq-linux64 -O /usr/local/bin/jq
+            chmod +x /usr/local/bin/jq
             blackbox $SPREADSHEET_ID $PROGPATH
 
