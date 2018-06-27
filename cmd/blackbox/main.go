@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -284,6 +285,39 @@ func RunExploration(progPath string, varNames []string, inputSets [][]string, re
 	return nil
 }
 
+func CreateNewResultSheet(srv *sheets.Service, spreadsheetID, sheetName string) error {
+
+	addRequest := sheets.Request{}
+
+	requestsString := fmt.Sprintf(`{
+      "addSheet": {
+        "properties": {
+          "title": "%s",
+          "tabColor": {
+            "red": 1.0,
+            "green": 0.3,
+            "blue": 0.4
+          }
+        }
+      }
+	}`, sheetName)
+	err := json.Unmarshal([]byte(requestsString), &addRequest)
+	if err != nil {
+		return err
+	}
+
+	rb := &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: []*sheets.Request{&addRequest},
+	}
+
+	_, err = srv.Spreadsheets.BatchUpdate(spreadsheetID, rb).Do()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func main() {
 	fmt.Println("blackbox\n========")
 	// Read the spreadsheet
@@ -315,12 +349,19 @@ func main() {
 	inputSets := GetInputSets(exampleSets)
 	log.Printf("Got %d input sets for %d variables\n", len(inputSets), len(varNames))
 
+	resultSheetName := fmt.Sprintf("result_%d", time.Now().Unix())
+	//Add new sheet for this particular run
+	err = CreateNewResultSheet(srv, spreadsheetId, resultSheetName)
+	if err != nil {
+		panic(err)
+	}
+
 	// For each input set
 	//   run adapter
 	//   record output on the spreadsheet
 	resultChannel := make(chan []string)
 	defer close(resultChannel)
-	go RecordResults(srv, spreadsheetId, "result", varNames, resultChannel)
+	go RecordResults(srv, spreadsheetId, resultSheetName, varNames, resultChannel)
 
 	err = RunExploration(progPath, varNames, inputSets, resultChannel)
 	if err != nil {
