@@ -1,0 +1,40 @@
+---
+resources:
+- name: code-repo
+  type: git
+  source:
+    uri: https://github.com/oozie/blackbox
+
+jobs:
+- name: blackbox
+  plan:
+    - get: code-repo
+    - get: test-repo
+      resource: code-repo
+    - task: run
+      params:
+        SPREADSHEET_ID: ((blackbox/Notes/spreadsheet_id))
+        CLIENT_SECRET_JSON: ((blackbox/Notes/client_secret))
+        CACHED_CREDS_JSON: ((blackbox/Notes/cached_secret))
+        PROGPATH: test-repo/example/adapter
+      config:
+        platform: linux
+        image_resource:
+          type: docker-image
+          source:
+            repository: golang
+        inputs:
+        - name: code-repo
+        - name: test-repo
+        run:
+          path: bash
+          args:
+          - -ec
+          - |
+            export CLIENT_SECRET_FILE=/tmp/client_secret.json
+            export CACHED_CREDS_FILE=/tmp/cached_secret.json
+            echo "$CLIENT_SECRET_JSON" > $CLIENT_SECRET_FILE
+            echo "$CACHED_CREDS_JSON" > $CACHED_CREDS_FILE
+            go get github.com/oozie/blackbox/cmd/blackbox
+            blackbox $SPREADSHEET_ID $PROGPATH
+
