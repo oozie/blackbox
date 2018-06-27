@@ -340,21 +340,37 @@ func main() {
 	log.Printf("Got %d input sets for %d variables\n", len(inputSets), len(varNames))
 
 	resultSheetName := fmt.Sprintf("result_%d", time.Now().Unix())
-	//Add new sheet for this particular run
 	err = CreateNewResultSheet(srv, spreadsheetId, resultSheetName)
 	if err != nil {
 		panic(err)
 	}
 
-	// For each input set
-	//   run adapter
-	//   record output on the spreadsheet
 	resultChannel := make(chan []string)
 	defer close(resultChannel)
-	go RecordResults(srv, spreadsheetId, resultSheetName, varNames, resultChannel)
+	recordErrorChannel := make(chan error)
+	defer close(recordErrorChannel)
+	exploreErrorChannel := make(chan error)
+	defer close(exploreErrorChannel)
 
-	err = RunExploration(progPath, varNames, inputSets, resultChannel)
-	if err != nil {
-		panic(err)
+	go func() {
+		recordErrorChannel <- RecordResults(srv, spreadsheetId, resultSheetName, varNames, resultChannel)
+	}()
+
+	go func() {
+		exploreErrorChannel <- RunExploration(progPath, varNames, inputSets, resultChannel)
+	}()
+
+	for {
+		select {
+		case err := <-recordErrorChannel:
+			if err != nil {
+				panic(err)
+			}
+		case err := <-exploreErrorChannel:
+			if err != nil {
+				panic(err)
+			}
+			return
+		}
 	}
 }
