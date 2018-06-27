@@ -1,0 +1,14 @@
+#!/bin/bash
+
+
+MYDIR=$(dirname $0)
+
+# Read inputs: flat json, e.g. '{"x": 3}'
+input=$(cat)
+# Read inputs
+x=$(echo $input | jq .x)
+# Run the exploration
+y=$($MYDIR/number-blackbox $x)
+
+# Write outputs: flat json '{"y": 16}'
+echo "{ \"y\": $y }"
